@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Mole Antonelliana · AR Beta</title>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1A1916;--ink-soft:#3D3B35;--warm:#F5F0E8;--stone:#C8C4BB;
+  --stone-dk:#8A857C;--gold:#C9A84C;--gold-glow:#F0C96E;--bg:#F2EEE6;
+}
+html,body{height:100%;background:var(--bg);color:var(--ink);
+  font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
+.header{padding:24px 20px 16px;background:var(--warm);border-bottom:1px solid var(--stone)}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.badge{font-size:9px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--gold);border:1px solid var(--gold);padding:3px 8px;border-radius:2px}
+.city{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--stone-dk)}
+h1{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;line-height:1.1}
+h1 em{font-style:italic;color:var(--ink-soft)}
+.subtitle{font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--stone-dk);margin-top:3px}
+.viewer-wrap{position:relative;background:#E8E4DC;border-bottom:1px solid var(--stone)}
+model-viewer{width:100%;height:55vw;min-height:260px;max-height:400px;
+  --progress-bar-color:var(--gold)}
+model-viewer::part(default-ar-button){display:none}
+.viewer-tag{position:absolute;bottom:10px;left:14px;font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--stone-dk);pointer-events:none}
+.ar-section{padding:18px 20px 16px;background:var(--warm);
+  border-bottom:1px solid var(--stone);text-align:center}
+.ar-btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);
+  color:var(--gold-glow);font-family:'DM Sans',sans-serif;font-size:12px;
+  font-weight:500;letter-spacing:.14em;text-transform:uppercase;border:none;
+  padding:14px 28px;border-radius:2px;cursor:pointer;width:100%;max-width:340px;
+  justify-content:center;transition:background .2s,transform .15s}
+.ar-btn:active{transform:scale(.97);background:#2D2C28}
+.ar-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.ar-hint{margin-top:9px;font-size:10px;color:var(--stone-dk);line-height:1.5}
+.progress-wrap{padding:20px;text-align:center}
+.progress-bar{width:100%;height:4px;background:var(--stone);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:var(--gold);width:0%;transition:width .3s;border-radius:2px}
+.progress-label{font-size:11px;color:var(--stone-dk)}
+.calib{display:none;background:var(--ink);padding:14px 20px;border-bottom:1px solid #333}
+.calib.show{display:block}
+.calib-title{font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:10px}
+.calib-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.calib-group{display:flex;flex-direction:column;gap:4px}
+.calib-label{font-size:9px;color:#888;letter-spacing:.1em;text-transform:uppercase}
+.calib-val{font-size:14px;font-weight:500;color:var(--gold-glow);font-family:monospace;text-align:center}
+.calib-btns{display:flex;gap:4px;justify-content:center}
+.calib-btn{background:#2D2C28;color:#ccc;border:1px solid #444;border-radius:2px;
+  padding:5px 10px;font-size:13px;cursor:pointer;flex:1}
+.calib-copy{margin-top:10px;width:100%;background:var(--gold);color:var(--ink);border:none;
+  border-radius:2px;padding:8px;font-size:11px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;cursor:pointer}
+.info{padding:20px 20px 0}
+.sec-label{font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--gold);font-weight:500;margin-bottom:12px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.card{background:var(--warm);border:1px solid var(--stone);border-radius:3px;padding:12px 12px 10px}
+.card-val{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;
+  color:var(--ink);line-height:1;margin-bottom:3px}
+.card-unit{font-size:10px;color:var(--stone-dk);font-weight:300}
+.card-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone-dk);margin-top:5px}
+.desc{font-size:13px;line-height:1.7;color:var(--ink-soft);margin-bottom:18px;font-weight:300}
+.gps{background:var(--ink);color:var(--stone);font-family:monospace;font-size:10px;
+  letter-spacing:.1em;padding:9px 14px;border-radius:3px;display:flex;
+  justify-content:space-between;margin-bottom:20px}
+.gps span{color:var(--gold)}
+.footer{padding:14px 20px 32px;border-top:1px solid var(--stone);font-size:10px;
+  color:var(--stone-dk);display:flex;justify-content:space-between;
+  align-items:center;flex-wrap:wrap;gap:5px;margin-top:4px}
+.footer-logo{font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:600;color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="badge">AR Beta · Torino</div>
+    <div class="city">Via Montebello 20</div>
+  </div>
+  <h1>Mole <em>Antonelliana</em></h1>
+  <div class="subtitle">Test realtà aumentata · modello 3D in scala reale</div>
+</div>
+
+<div class="viewer-wrap">
+  <model-viewer id="mv"
+    src="mole_antonelliana_opt.glb"
+    alt="Modello 3D Mole Antonelliana"
+    camera-controls touch-action="pan-y"
+    auto-rotate auto-rotate-delay="2000"
+    rotation-per-second="5deg"
+    camera-orbit="30deg 75deg 400m"
+    min-camera-orbit="auto auto 50m"
+    max-camera-orbit="auto auto 800m"
+    shadow-intensity="0.8"
+    environment-image="neutral"
+    ar ar-modes="quick-look webxr scene-viewer"
+    ar-scale="fixed">
+  </model-viewer>
+  <div class="viewer-tag">Modello: salahzar / Sketchfab · CC BY</div>
+</div>
+
+<div class="ar-section">
+  <button class="ar-btn" id="ar-btn" disabled>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="1.5">
+      <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+      <path d="M12 8l4 2-4 2-4-2 4-2z"/>
+      <path d="M8 10l-1.5 3L12 16l5.5-3L16 10"/>
+    </svg>
+    <span id="ar-label">Caricamento modello…</span>
+  </button>
+  <div class="ar-hint" id="ar-hint">Attendi il caricamento del modello 3D</div>
+</div>
+
+<div class="calib" id="calib">
+  <div class="calib-title">Pannello calibrazione · solo sviluppo</div>
+  <div class="calib-grid">
+    <div class="calib-group">
+      <div class="calib-label">Altezza (Y)</div>
+      <div class="calib-val" id="val-y">0.0 m</div>
+      <div class="calib-btns">
+        <button class="calib-btn" onclick="adjust('y',-0.5)">▼</button>
+        <button class="calib-btn" onclick="adjust('y',0.5)">▲</button>
+      </div>
+    </div>
+    <div class="calib-group">
+      <div class="calib-label">Rotazione (°)</div>
+      <div class="calib-val" id="val-r">0°</div>
+      <div class="calib-btns">
+        <button class="calib-btn" onclick="adjust('r',-5)">◄</button>
+        <button class="calib-btn" onclick="adjust('r',5)">►</button>
+      </div>
+    </div>
+    <div class="calib-group">
+      <div class="calib-label">Scala</div>
+      <div class="calib-val" id="val-s">1.0x</div>
+      <div class="calib-btns">
+        <button class="calib-btn" onclick="adjust('s',-0.1)">−</button>
+        <button class="calib-btn" onclick="adjust('s',0.1)">+</button>
+      </div>
+    </div>
+  </div>
+  <button class="calib-copy" onclick="copyCalib()">Copia valori calibrazione</button>
+</div>
+
+<div class="info">
+  <div class="sec-label">Dati edificio</div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-val">167</div>
+      <div class="card-unit">metri</div>
+      <div class="card-lbl">Altezza</div>
+    </div>
+    <div class="card">
+      <div class="card-val">1889</div>
+      <div class="card-unit">completata</div>
+      <div class="card-lbl">Anno</div>
+    </div>
+    <div class="card">
+      <div class="card-val">47</div>
+      <div class="card-unit">anni</div>
+      <div class="card-lbl">Costruzione</div>
+    </div>
+    <div class="card">
+      <div class="card-val">1863</div>
+      <div class="card-unit">inizio lavori</div>
+      <div class="card-lbl">Anno</div>
+    </div>
+  </div>
+  <div class="sec-label">Descrizione</div>
+  <p class="desc">La Mole Antonelliana è il simbolo di Torino. Progettata da Alessandro Antonelli come sinagoga, fu completata nel 1889 dopo 47 anni di costruzione. Oggi ospita il Museo Nazionale del Cinema ed è l'edificio più alto costruito in muratura in Europa.</p>
+  <div class="sec-label">Posizione GPS</div>
+  <div class="gps">
+    <div>45.0693° N &nbsp;·&nbsp; 7.6929° E</div>
+    <div>Via Montebello <span>20</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-logo">Torino AR · Beta</div>
+  <div>Modello: salahzar / Sketchfab · CC BY</div>
+</div>
+
+<script>
+const state = { y:0, r:0, s:1.0 };
+const mv = document.getElementById('mv');
+const btn = document.getElementById('ar-btn');
+const label = document.getElementById('ar-label');
+const hint = document.getElementById('ar-hint');
+
+function adjust(axis, delta) {
+  if (axis==='s') state.s = Math.max(0.1, Math.round((state.s+delta)*10)/10);
+  else if (axis==='y') state.y = Math.round((state.y+delta)*10)/10;
+  else state.r = (state.r+delta+360)%360;
+  document.getElementById('val-y').textContent = state.y+' m';
+  document.getElementById('val-r').textContent = state.r+'°';
+  document.getElementById('val-s').textContent = state.s+'x';
+}
+function copyCalib() {
+  const txt = 'Y='+state.y+'m  R='+state.r+'deg  S='+state.s+'x';
+  navigator.clipboard.writeText(txt).then(()=>alert('Copiato: '+txt));
+}
+
+mv.addEventListener('load', () => {
+  btn.disabled = false;
+  document.getElementById('calib').classList.add('show');
+  if (mv.canActivateAR) {
+    label.textContent = 'Visualizza in Realtà Aumentata';
+    hint.textContent = 'Punta il telefono verso la Mole · Safari iOS';
+  } else {
+    label.textContent = 'AR non supportata su questo browser';
+    hint.textContent = 'Il modello 3D è visibile qui sopra';
+    btn.disabled = true;
+  }
+});
+
+mv.addEventListener('error', (e) => {
+  hint.textContent = 'Errore caricamento modello GLB. Controlla che il file sia nella stessa cartella.';
+  console.error(e);
+});
+
+btn.addEventListener('click', () => {
+  if (!btn.disabled && mv.canActivateAR) {
+    try { mv.activateAR(); }
+    catch(e) { alert('Errore AR: '+e.message); }
+  }
+});
+</script>
+</body>
+</html>
