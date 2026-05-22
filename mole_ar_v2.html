@@ -30,6 +30,8 @@ model-viewer{width:100%;height:55vw;min-height:260px;max-height:400px;
 model-viewer::part(default-ar-button){display:none}
 .viewer-tag{position:absolute;bottom:10px;left:14px;font-size:9px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--stone-dk);pointer-events:none}
+.viewer-coords{position:absolute;bottom:10px;right:14px;font-size:9px;
+  font-family:monospace;color:var(--stone-dk);pointer-events:none}
 .ar-section{padding:18px 20px 16px;background:var(--warm);
   border-bottom:1px solid var(--stone);text-align:center}
 .ar-btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);
@@ -40,10 +42,6 @@ model-viewer::part(default-ar-button){display:none}
 .ar-btn:active{transform:scale(.97);background:#2D2C28}
 .ar-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .ar-hint{margin-top:9px;font-size:10px;color:var(--stone-dk);line-height:1.5}
-.progress-wrap{padding:20px;text-align:center}
-.progress-bar{width:100%;height:4px;background:var(--stone);border-radius:2px;overflow:hidden;margin-bottom:8px}
-.progress-fill{height:100%;background:var(--gold);width:0%;transition:width .3s;border-radius:2px}
-.progress-label{font-size:11px;color:var(--stone-dk)}
 .calib{display:none;background:var(--ink);padding:14px 20px;border-bottom:1px solid #333}
 .calib.show{display:block}
 .calib-title{font-size:9px;letter-spacing:.18em;text-transform:uppercase;
@@ -55,6 +53,7 @@ model-viewer::part(default-ar-button){display:none}
 .calib-btns{display:flex;gap:4px;justify-content:center}
 .calib-btn{background:#2D2C28;color:#ccc;border:1px solid #444;border-radius:2px;
   padding:5px 10px;font-size:13px;cursor:pointer;flex:1}
+.calib-btn:active{background:#444}
 .calib-copy{margin-top:10px;width:100%;background:var(--gold);color:var(--ink);border:none;
   border-radius:2px;padding:8px;font-size:11px;font-weight:500;letter-spacing:.1em;
   text-transform:uppercase;cursor:pointer}
@@ -92,6 +91,10 @@ model-viewer::part(default-ar-button){display:none}
 <div class="viewer-wrap">
   <model-viewer id="mv"
     src="mole_antonelliana_opt.glb"
+    ios-src="MOLE_ANTONELLIANA_TORINO.usdz"
+    ar
+    ar-modes="quick-look webxr scene-viewer"
+    ar-scale="fixed"
     alt="Modello 3D Mole Antonelliana"
     camera-controls touch-action="pan-y"
     auto-rotate auto-rotate-delay="2000"
@@ -100,11 +103,10 @@ model-viewer::part(default-ar-button){display:none}
     min-camera-orbit="auto auto 50m"
     max-camera-orbit="auto auto 800m"
     shadow-intensity="0.8"
-    environment-image="neutral"
-    ar ar-modes="quick-look webxr scene-viewer"
-    ar-scale="fixed">
+    environment-image="neutral">
   </model-viewer>
   <div class="viewer-tag">Modello: salahzar / Sketchfab · CC BY</div>
+  <div class="viewer-coords">45.0693° N · 7.6929° E</div>
 </div>
 
 <div class="ar-section">
@@ -132,7 +134,7 @@ model-viewer::part(default-ar-button){display:none}
       </div>
     </div>
     <div class="calib-group">
-      <div class="calib-label">Rotazione (°)</div>
+      <div class="calib-label">Rotazione</div>
       <div class="calib-val" id="val-r">0°</div>
       <div class="calib-btns">
         <button class="calib-btn" onclick="adjust('r',-5)">◄</button>
@@ -175,8 +177,12 @@ model-viewer::part(default-ar-button){display:none}
       <div class="card-lbl">Anno</div>
     </div>
   </div>
+
   <div class="sec-label">Descrizione</div>
-  <p class="desc">La Mole Antonelliana è il simbolo di Torino. Progettata da Alessandro Antonelli come sinagoga, fu completata nel 1889 dopo 47 anni di costruzione. Oggi ospita il Museo Nazionale del Cinema ed è l'edificio più alto costruito in muratura in Europa.</p>
+  <p class="desc">La Mole Antonelliana è il simbolo di Torino. Progettata da Alessandro Antonelli
+    come sinagoga, fu completata nel 1889 dopo 47 anni di costruzione. Oggi ospita il
+    Museo Nazionale del Cinema ed è l'edificio più alto costruito in muratura in Europa.</p>
+
   <div class="sec-label">Posizione GPS</div>
   <div class="gps">
     <div>45.0693° N &nbsp;·&nbsp; 7.6929° E</div>
@@ -205,11 +211,15 @@ function adjust(axis, delta) {
   document.getElementById('val-s').textContent = state.s+'x';
 }
 function copyCalib() {
-  const txt = 'Y='+state.y+'m  R='+state.r+'deg  S='+state.s+'x';
-  navigator.clipboard.writeText(txt).then(()=>alert('Copiato: '+txt));
+  var txt = 'Y='+state.y+'m  R='+state.r+'deg  S='+state.s+'x';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(function(){alert('Copiato: '+txt);});
+  } else {
+    prompt('Copia questi valori:', txt);
+  }
 }
 
-mv.addEventListener('load', () => {
+mv.addEventListener('load', function() {
   btn.disabled = false;
   document.getElementById('calib').classList.add('show');
   if (mv.canActivateAR) {
@@ -222,12 +232,11 @@ mv.addEventListener('load', () => {
   }
 });
 
-mv.addEventListener('error', (e) => {
-  hint.textContent = 'Errore caricamento modello GLB. Controlla che il file sia nella stessa cartella.';
-  console.error(e);
+mv.addEventListener('error', function() {
+  hint.textContent = 'Errore caricamento modello.';
 });
 
-btn.addEventListener('click', () => {
+btn.addEventListener('click', function() {
   if (!btn.disabled && mv.canActivateAR) {
     try { mv.activateAR(); }
     catch(e) { alert('Errore AR: '+e.message); }
