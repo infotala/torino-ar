@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mole Antonelliana · AR Beta</title>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1A1916;--warm:#F5F0E8;--stone:#C8C4BB;--stone-dk:#8A857C;
+  --gold:#C9A84C;--gold-glow:#F0C96E;--bg:#F2EEE6}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif}
+.hdr{padding:20px;background:var(--warm);border-bottom:1px solid var(--stone)}
+.badge{display:inline-block;font-size:9px;font-weight:500;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);
+  padding:3px 8px;border-radius:2px;margin-bottom:8px}
+h1{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:300}
+.sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--stone-dk);margin-top:4px}
+model-viewer{width:100%;height:50vh;background:#222;display:block}
+.ar-bar{padding:16px 20px;background:var(--warm);border-bottom:1px solid var(--stone);text-align:center}
+.ar-btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);
+  color:var(--gold-glow);font-size:12px;font-weight:500;letter-spacing:.12em;
+  text-transform:uppercase;border:none;padding:14px 24px;border-radius:2px;
+  cursor:pointer;width:100%;max-width:340px;justify-content:center}
+.ar-btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{margin-top:8px;font-size:10px;color:var(--stone-dk)}
+.info{padding:20px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.card{background:var(--warm);border:1px solid var(--stone);border-radius:3px;padding:12px}
+.cv{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300}
+.cl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone-dk);margin-top:4px}
+.gps{background:var(--ink);color:var(--stone);font-family:monospace;font-size:10px;
+  padding:9px 14px;border-radius:3px;display:flex;justify-content:space-between}
+.gps span{color:var(--gold)}
+.ft{padding:14px 20px;border-top:1px solid var(--stone);font-size:10px;color:var(--stone-dk)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="badge">AR Beta · Torino</div>
+  <h1>Mole Antonelliana</h1>
+  <div class="sub">Via Montebello 20 · test realtà aumentata</div>
+</div>
+
+<model-viewer id="mv"
+  src="mole_antonelliana_opt.glb"
+  ios-src="MOLE_ANTONELLIANA_TORINO.usdz"
+  ar
+  ar-modes="quick-look webxr scene-viewer"
+  ar-scale="fixed"
+  camera-controls
+  auto-rotate
+  shadow-intensity="0.8"
+  environment-image="neutral">
+</model-viewer>
+
+<div class="ar-bar">
+  <button class="ar-btn" id="btn" disabled>
+    <span id="lbl">Caricamento…</span>
+  </button>
+  <div class="hint" id="hint">Attendi il caricamento del modello</div>
+</div>
+
+<div class="info">
+  <div class="cards">
+    <div class="card"><div class="cv">167 m</div><div class="cl">Altezza</div></div>
+    <div class="card"><div class="cv">1889</div><div class="cl">Completata</div></div>
+    <div class="card"><div class="cv">47 anni</div><div class="cl">Costruzione</div></div>
+    <div class="card"><div class="cv">1863</div><div class="cl">Inizio lavori</div></div>
+  </div>
+  <div class="gps">
+    <div>45.0693° N · 7.6929° E</div>
+    <div>Via Montebello <span>20</span></div>
+  </div>
+</div>
+
+<div class="ft">Modello: salahzar / Sketchfab · CC BY · Torino AR Beta</div>
+
+<script>
+var mv = document.getElementById('mv');
+var btn = document.getElementById('btn');
+var lbl = document.getElementById('lbl');
+var hint = document.getElementById('hint');
+
+mv.addEventListener('load', function() {
+  btn.disabled = false;
+  if (mv.canActivateAR) {
+    lbl.textContent = 'Visualizza in Realtà Aumentata';
+    hint.textContent = 'Punta il telefono · Safari iOS o Chrome Android';
+  } else {
+    lbl.textContent = 'AR non supportata';
+    hint.textContent = 'Il modello 3D è visibile qui sopra';
+    btn.disabled = true;
+  }
+});
+
+btn.addEventListener('click', function() {
+  if (mv.canActivateAR) mv.activateAR();
+});
+</script>
+</body>
+</html>
