@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mole AR GPS Test</title>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+<style>
+*{margin:0;padding:0}
+#overlay{position:fixed;top:0;left:0;right:0;z-index:999;pointer-events:none}
+#info{background:rgba(0,0,0,0.75);color:#fff;padding:12px 16px;font-family:sans-serif;
+  font-size:13px;line-height:1.5;text-align:center}
+#status{background:rgba(201,168,76,0.9);color:#1a1916;padding:8px 16px;font-family:monospace;
+  font-size:11px;text-align:center}
+#debug{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#0f0;
+  font-family:monospace;font-size:10px;padding:8px 12px;z-index:999;
+  max-height:30vh;overflow-y:auto}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="info">
+    <strong>Mole Antonelliana · AR GPS Test</strong><br>
+    Punta il telefono verso la Mole
+  </div>
+  <div id="status">GPS: in attesa...</div>
+</div>
+<div id="debug"></div>
+
+<a-scene
+  vr-mode-ui="enabled: false"
+  arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false"
+  renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true"
+  embedded>
+
+  <a-entity
+    gps-entity-place="latitude: 45.06935; longitude: 7.69295"
+    gltf-model="mole_antonelliana_torino.glb"
+    scale="1 1 1"
+    rotation="0 0 0">
+  </a-entity>
+
+  <a-camera gps-camera="simulateLatitude: 0; simulateLongitude: 0" rotation-reader></a-camera>
+</a-scene>
+
+<script>
+var dbg = document.getElementById('debug');
+var statusEl = document.getElementById('status');
+
+function log(msg) {
+  var t = new Date().toLocaleTimeString();
+  dbg.innerHTML = t + ' ' + msg + '<br>' + dbg.innerHTML;
+  if (dbg.children.length > 30) dbg.lastChild.remove();
+}
+
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(
+    function(pos) {
+      var lat = pos.coords.latitude.toFixed(6);
+      var lon = pos.coords.longitude.toFixed(6);
+      var acc = pos.coords.accuracy.toFixed(0);
+      statusEl.textContent = 'GPS: ' + lat + ', ' + lon + ' · precisione: ±' + acc + 'm';
+      log('GPS ok: ' + lat + ', ' + lon + ' acc:' + acc + 'm');
+    },
+    function(err) {
+      statusEl.textContent = 'GPS errore: ' + err.message;
+      log('GPS errore: ' + err.message);
+    },
+    {enableHighAccuracy: true, maximumAge: 0, timeout: 27000}
+  );
+}
+
+window.addEventListener('load', function() {
+  log('Pagina caricata');
+  
+  var model = document.querySelector('[gps-entity-place]');
+  if (model) {
+    model.addEventListener('loaded', function() {
+      log('Modello 3D caricato ✅');
+    });
+    model.addEventListener('gps-entity-place-added', function(e) {
+      log('GPS entity aggiunta - distanza: ' + e.detail.distance.toFixed(0) + 'm');
+      statusEl.textContent += ' · modello a ' + e.detail.distance.toFixed(0) + 'm';
+    });
+    model.addEventListener('gps-entity-place-update-position', function(e) {
+      log('Aggiornato - distanza: ' + e.detail.distance.toFixed(0) + 'm');
+    });
+    
+    // Monitor GLB loading
+    model.addEventListener('model-loaded', function() {
+      log('GLB renderizzato ✅');
+    });
+    model.addEventListener('model-error', function(e) {
+      log('GLB ERRORE ❌: ' + JSON.stringify(e.detail));
+    });
+  }
+});
+</script>
+</body>
+</html>
