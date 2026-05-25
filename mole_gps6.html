@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mole AR GPS</title>
+<style>
+*{margin:0;padding:0}
+#splash{position:fixed;inset:0;z-index:9999;background:#1a1916;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#splash h1{color:#C9A84C;font-family:sans-serif;font-size:22px}
+#splash p{color:#999;font-family:sans-serif;font-size:13px;max-width:280px;text-align:center;line-height:1.5}
+#go-btn{background:#C9A84C;color:#1a1916;border:none;border-radius:8px;
+  padding:18px 40px;font-size:18px;font-weight:600;cursor:pointer;margin-top:10px}
+#hud{position:fixed;top:0;left:0;right:0;z-index:999;pointer-events:none;
+  background:rgba(201,168,76,0.9);padding:6px 12px;font-family:monospace;
+  font-size:11px;text-align:center;color:#1a1916;display:none}
+#log{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;
+  font-family:monospace;font-size:10px;padding:6px 10px;z-index:999;
+  max-height:30vh;overflow-y:auto;display:none}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <h1>Mole Antonelliana · AR</h1>
+  <p>Dopo aver premuto Avvia, concedi i permessi e guardati intorno lentamente.</p>
+  <button id="go-btn">Avvia AR</button>
+</div>
+<div id="hud"></div>
+<div id="log"></div>
+
+<script>
+var hud = document.getElementById('hud');
+var logEl = document.getElementById('log');
+
+function log(msg) {
+  logEl.innerHTML = new Date().toLocaleTimeString() + ' ' + msg + '<br>' + logEl.innerHTML;
+}
+
+document.getElementById('go-btn').addEventListener('click', async function() {
+  
+  // 1. Permesso orientamento iOS
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && 
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      var perm = await DeviceOrientationEvent.requestPermission();
+      log('Orientamento: ' + perm);
+    }
+  } catch(e) { log('Errore orientamento: ' + e); }
+
+  // 2. Ottieni posizione
+  var pos = await new Promise(function(resolve, reject) {
+    navigator.geolocation.getCurrentPosition(resolve, reject, 
+      {enableHighAccuracy: true, timeout: 15000});
+  });
+  
+  var myLat = pos.coords.latitude;
+  var myLon = pos.coords.longitude;
+  log('Posizione: ' + myLat.toFixed(6) + ', ' + myLon.toFixed(6) + ' ±' + pos.coords.accuracy.toFixed(0) + 'm');
+
+  // Cubo test a ~25m nord
+  var cubeLat = myLat + 0.00022;
+  var cubeLon = myLon;
+
+  // 3. Nascondi splash, mostra HUD
+  document.getElementById('splash').style.display = 'none';
+  hud.style.display = 'block';
+  logEl.style.display = 'block';
+  hud.textContent = 'GPS: ' + myLat.toFixed(6) + ', ' + myLon.toFixed(6);
+
+  // 4. Carica A-Frame 1.3.0 + AR.js location-based
+  await loadScript('https://aframe.io/releases/1.3.0/aframe.min.js');
+  log('A-Frame 1.3.0 caricato ✅');
+  
+  await loadScript('https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js');
+  
+  await loadScript('https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js');
+  log('AR.js caricato ✅');
+
+  // 5. Crea la scena
+  var scene = document.createElement('a-scene');
+  scene.setAttribute('vr-mode-ui', 'enabled: false');
+  scene.setAttribute('arjs', 'sourceType: webcam; videoTexture: true; debugUIEnabled: false');
+  scene.setAttribute('renderer', 'antialias: true; alpha: true');
+  scene.setAttribute('embedded', '');
+
+  // Cubo rosso vicino
+  var cubeWrap = document.createElement('a-entity');
+  cubeWrap.setAttribute('gps-projected-entity-place', 'latitude: ' + cubeLat + '; longitude: ' + cubeLon);
+  var cube = document.createElement('a-box');
+  cube.setAttribute('color', 'red');
+  cube.setAttribute('scale', '20 20 20');
+  cubeWrap.appendChild(cube);
+  scene.appendChild(cubeWrap);
+
+  // Colonna gialla alla Mole
+  var beaconWrap = document.createElement('a-entity');
+  beaconWrap.setAttribute('gps-projected-entity-place', 'latitude: 45.06935; longitude: 7.69295');
+  var beacon = document.createElement('a-box');
+  beacon.setAttribute('color', 'yellow');
+  beacon.setAttribute('scale', '10 300 10');
+  beacon.setAttribute('position', '0 150 0');
+  beaconWrap.appendChild(beacon);
+  scene.appendChild(beaconWrap);
+
+  // Camera GPS
+  var cam = document.createElement('a-camera');
+  cam.setAttribute('gps-projected-camera', '');
+  cam.setAttribute('rotation-reader', '');
+  cam.setAttribute('near', '1');
+  cam.setAttribute('far', '100000');
+  scene.appendChild(cam);
+
+  document.body.appendChild(scene);
+  log('Scena aggiunta al DOM');
+
+  // Monitor eventi
+  cubeWrap.addEventListener('gps-entity-place-added', function(e) {
+    log('CUBO ROSSO VISIBILE a ' + e.detail.distance.toFixed(0) + 'm ✅✅✅');
+  });
+  beaconWrap.addEventListener('gps-entity-place-added', function(e) {
+    log('BEACON GIALLO a ' + e.detail.distance.toFixed(0) + 'm ✅✅✅');
+  });
+
+  scene.addEventListener('loaded', function() {
+    log('Scena loaded ✅');
+  });
+
+  // GPS continuo
+  navigator.geolocation.watchPosition(function(p) {
+    hud.textContent = 'GPS: ' + p.coords.latitude.toFixed(6) + ', ' +
+      p.coords.longitude.toFixed(6) + ' · ±' + p.coords.accuracy.toFixed(0) + 'm';
+  }, function(){}, {enableHighAccuracy: true, maximumAge: 0});
+});
+
+function loadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+</script>
+</body>
+</html>
