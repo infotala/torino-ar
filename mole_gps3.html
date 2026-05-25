@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mole AR GPS Test</title>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+<style>
+*{margin:0;padding:0}
+#overlay{position:fixed;top:0;left:0;right:0;z-index:999;pointer-events:none}
+#info{background:rgba(0,0,0,0.75);color:#fff;padding:12px 16px;font-family:sans-serif;
+  font-size:13px;line-height:1.5;text-align:center}
+#status{background:rgba(201,168,76,0.9);color:#1a1916;padding:8px 16px;font-family:monospace;
+  font-size:11px;text-align:center}
+#controls{position:fixed;bottom:0;left:0;right:0;z-index:999;background:rgba(0,0,0,0.85);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#controls button{background:#C9A84C;color:#1a1916;border:none;border-radius:3px;
+  padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;flex:1}
+#controls span{color:#0f0;font-family:monospace;font-size:12px;min-width:80px;text-align:center}
+#debug{position:fixed;bottom:56px;left:0;right:0;background:rgba(0,0,0,0.8);color:#0f0;
+  font-family:monospace;font-size:10px;padding:8px 12px;z-index:998;
+  max-height:20vh;overflow-y:auto}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="info">
+    <strong>Mole Antonelliana · AR GPS</strong><br>
+    Punta il telefono verso la Mole
+  </div>
+  <div id="status">GPS: in attesa...</div>
+</div>
+<div id="debug"></div>
+<div id="controls">
+  <button onclick="changeScale(-5)">− scala</button>
+  <span id="scaleLabel">10x</span>
+  <button onclick="changeScale(5)">+ scala</button>
+</div>
+
+<a-scene
+  vr-mode-ui="enabled: false"
+  arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false"
+  renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true"
+  embedded>
+
+  <a-entity id="mole-model"
+    gps-entity-place="latitude: 45.06935; longitude: 7.69295"
+    gltf-model="mole_antonelliana_torino.glb"
+    scale="10 10 10"
+    rotation="0 0 0">
+  </a-entity>
+
+  <!-- Beacon rosso sopra la Mole per trovarla -->
+  <a-entity
+    gps-entity-place="latitude: 45.06935; longitude: 7.69295">
+    <a-sphere color="red" radius="8" position="0 200 0" opacity="0.7"></a-sphere>
+    <a-sphere color="red" radius="4" position="0 220 0" opacity="0.5"></a-sphere>
+  </a-entity>
+
+  <a-camera gps-camera="simulateLatitude: 0; simulateLongitude: 0" rotation-reader></a-camera>
+</a-scene>
+
+<script>
+var dbg = document.getElementById('debug');
+var statusEl = document.getElementById('status');
+var currentScale = 10;
+
+function log(msg) {
+  var t = new Date().toLocaleTimeString();
+  dbg.innerHTML = t + ' ' + msg + '<br>' + dbg.innerHTML;
+  if (dbg.children.length > 20) dbg.lastChild.remove();
+}
+
+function changeScale(delta) {
+  currentScale = Math.max(1, currentScale + delta);
+  var model = document.getElementById('mole-model');
+  model.setAttribute('scale', currentScale + ' ' + currentScale + ' ' + currentScale);
+  document.getElementById('scaleLabel').textContent = currentScale + 'x';
+  log('Scala: ' + currentScale + 'x');
+}
+
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(
+    function(pos) {
+      var lat = pos.coords.latitude.toFixed(6);
+      var lon = pos.coords.longitude.toFixed(6);
+      var acc = pos.coords.accuracy.toFixed(0);
+      statusEl.textContent = 'GPS: ' + lat + ', ' + lon + ' · ±' + acc + 'm';
+    },
+    function(err) {
+      statusEl.textContent = 'GPS errore: ' + err.message;
+    },
+    {enableHighAccuracy: true, maximumAge: 0, timeout: 27000}
+  );
+}
+
+window.addEventListener('load', function() {
+  log('Pagina caricata');
+  var model = document.getElementById('mole-model');
+  if (model) {
+    model.addEventListener('model-loaded', function() {
+      log('GLB renderizzato ✅');
+    });
+    model.addEventListener('model-error', function(e) {
+      log('GLB ERRORE ❌');
+    });
+    model.addEventListener('gps-entity-place-added', function(e) {
+      log('Modello posizionato a ' + e.detail.distance.toFixed(0) + 'm');
+    });
+  }
+});
+</script>
+</body>
+</html>
