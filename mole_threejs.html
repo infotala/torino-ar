@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mole AR · Three.js</title>
+<style>
+*{margin:0;padding:0;overflow:hidden}
+body{background:#000}
+#video{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0}
+#canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+#splash{position:fixed;inset:0;z-index:999;background:#1a1916;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#splash h1{color:#C9A84C;font-family:sans-serif;font-size:24px;font-weight:400}
+#splash p{color:#999;font-family:sans-serif;font-size:13px;max-width:280px;
+  text-align:center;line-height:1.5}
+#start{background:#C9A84C;color:#1a1916;border:none;border-radius:8px;
+  padding:18px 40px;font-size:18px;font-weight:600;cursor:pointer}
+.hide{display:none !important}
+
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;pointer-events:none}
+#hud-bar{background:rgba(0,0,0,0.6);padding:6px 14px;font:11px/1.4 monospace;color:#C9A84C;
+  text-align:center}
+#compass{position:fixed;top:42px;right:12px;z-index:10;width:50px;height:50px;
+  pointer-events:none}
+#compass svg{width:100%;height:100%}
+#direction{position:fixed;top:42px;left:12px;z-index:10;background:rgba(0,0,0,0.6);
+  color:#fff;font:12px sans-serif;padding:6px 10px;border-radius:4px;pointer-events:none}
+#distance-tag{position:fixed;z-index:10;background:rgba(201,168,76,0.85);
+  color:#1a1916;font:bold 12px sans-serif;padding:4px 10px;border-radius:3px;
+  pointer-events:none;display:none;white-space:nowrap}
+#log{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.8);
+  color:#0f0;font:10px monospace;padding:6px 10px;max-height:25vh;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <h1>Mole Antonelliana</h1>
+  <p>Test AR con GPS + Three.js<br>Funziona su iPhone Safari e Android Chrome</p>
+  <button id="start">Avvia AR</button>
+</div>
+
+<video id="video" playsinline autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<div id="hud"><div id="hud-bar">Inizializzazione...</div></div>
+<div id="direction"></div>
+<div id="compass">
+  <svg viewBox="0 0 50 50">
+    <circle cx="25" cy="25" r="23" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+    <polygon id="needle" points="25,5 28,22 25,20 22,22" fill="#C9A84C"/>
+    <circle cx="25" cy="25" r="2" fill="#C9A84C"/>
+  </svg>
+</div>
+<div id="distance-tag"></div>
+<div id="log"></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// === ELEMENTI DOM ===
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const splash = document.getElementById('splash');
+const hudBar = document.getElementById('hud-bar');
+const dirEl = document.getElementById('direction');
+const needle = document.getElementById('needle');
+const distTag = document.getElementById('distance-tag');
+const logEl = document.getElementById('log');
+const startBtn = document.getElementById('start');
+
+function log(m) {
+  logEl.innerHTML = new Date().toLocaleTimeString() + ' ' + m + '<br>' + logEl.innerHTML;
+  if (logEl.children.length > 30) logEl.lastChild.remove();
+}
+
+// === MOLE COORDINATE ===
+const MOLE_LAT = 45.06935;
+const MOLE_LON = 7.69295;
+
+// === STATO ===
+let heading = 0;      // bussola: 0=nord, gradi
+let deviceBeta = 0;   // inclinazione avanti/indietro
+let deviceGamma = 0;  // inclinazione laterale
+let userLat = 0;
+let userLon = 0;
+let gpsReady = false;
+
+// === MATH GEO ===
+function gpsToLocal(lat, lon, refLat, refLon) {
+  const R = 6371000;
+  const dLat = (lat - refLat) * Math.PI / 180;
+  const dLon = (lon - refLon) * Math.PI / 180;
+  const z = -dLat * R;                                    // nord = -Z in Three.js
+  const x = dLon * R * Math.cos(refLat * Math.PI / 180);  // est = +X
+  return { x, z };
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function bearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+            Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// === THREE.JS SETUP ===
+const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
+camera.position.set(0, 1.6, 0); // altezza occhi
+
+// Luce
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(100, 200, 50);
+scene.add(sun);
+
+// === OGGETTI 3D ===
+
+// Placeholder Mole: piramide/torre
+const moleGroup = new THREE.Group();
+
+// Base quadrata
+const baseGeo = new THREE.BoxGeometry(40, 30, 40);
+const baseMat = new THREE.MeshLambertMaterial({ color: 0xD4C5A0 });
+const base = new THREE.Mesh(baseGeo, baseMat);
+base.position.y = 15;
+moleGroup.add(base);
+
+// Corpo principale (ottagono approssimato con cilindro)
+const bodyGeo = new THREE.CylinderGeometry(18, 22, 40, 8);
+const bodyMat = new THREE.MeshLambertMaterial({ color: 0xC8B898 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.position.y = 50;
+moleGroup.add(body);
+
+// Cupola
+const domeGeo = new THREE.CylinderGeometry(4, 18, 30, 8);
+const domeMat = new THREE.MeshLambertMaterial({ color: 0xB8A888 });
+const dome = new THREE.Mesh(domeGeo, domeMat);
+dome.position.y = 85;
+moleGroup.add(dome);
+
+// Guglia
+const spireGeo = new THREE.ConeGeometry(3, 70, 8);
+const spireMat = new THREE.MeshLambertMaterial({ color: 0x999078 });
+const spire = new THREE.Mesh(spireGeo, spireMat);
+spire.position.y = 135;
+moleGroup.add(spire);
+
+// Stella in cima
+const starGeo = new THREE.SphereGeometry(4, 8, 8);
+const starMat = new THREE.MeshLambertMaterial({ color: 0xC9A84C, emissive: 0xC9A84C, emissiveIntensity: 0.3 });
+const star = new THREE.Mesh(starGeo, starMat);
+star.position.y = 172;
+moleGroup.add(star);
+
+scene.add(moleGroup);
+
+// Cubo rosso test (25m a nord dell'utente — posizionato dopo GPS)
+const testCubeGeo = new THREE.BoxGeometry(5, 5, 5);
+const testCubeMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+const testCube = new THREE.Mesh(testCubeGeo, testCubeMat);
+testCube.position.set(0, 2.5, -25);
+scene.add(testCube);
+
+// === FRECCIA DIREZIONE ===
+// (Indicatore in basso sullo schermo che punta verso la Mole)
+
+// === RENDER LOOP ===
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (gpsReady) {
+    // Posiziona la Mole in coordinate locali
+    const moleLocal = gpsToLocal(MOLE_LAT, MOLE_LON, userLat, userLon);
+    moleGroup.position.set(moleLocal.x, 0, moleLocal.z);
+  }
+
+  // Rotazione camera basata su bussola e giroscopio
+  // Heading: 0=nord, 90=est, 180=sud, 270=ovest
+  // Three.js: Y rotation, 0=guarda verso -Z (nord)
+  const headingRad = heading * Math.PI / 180;
+  const betaRad = deviceBeta * Math.PI / 180;
+
+  // Landscape/portrait compensation
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = -headingRad;         // bussola: ruota orizzontalmente
+  camera.rotation.x = -(betaRad - Math.PI/2); // inclinazione: 90°=verticale=guarda avanti
+
+  renderer.render(scene, camera);
+
+  // Aggiorna HUD
+  if (gpsReady) {
+    const dist = haversine(userLat, userLon, MOLE_LAT, MOLE_LON);
+    const bear = bearing(userLat, userLon, MOLE_LAT, MOLE_LON);
+    hudBar.textContent = 'GPS: ' + userLat.toFixed(5) + ', ' + userLon.toFixed(5) +
+      ' | Mole: ' + dist.toFixed(0) + 'm · ' + bear.toFixed(0) + '°';
+
+    // Direzione relativa
+    let rel = ((bear - heading) + 360) % 360;
+    let arrow = '↑';
+    if (rel > 22 && rel <= 67) arrow = '↗';
+    else if (rel > 67 && rel <= 112) arrow = '→';
+    else if (rel > 112 && rel <= 157) arrow = '↘';
+    else if (rel > 157 && rel <= 202) arrow = '↓ (dietro di te)';
+    else if (rel > 202 && rel <= 247) arrow = '↙';
+    else if (rel > 247 && rel <= 292) arrow = '←';
+    else if (rel > 292 && rel <= 337) arrow = '↖';
+    dirEl.textContent = 'Mole ' + arrow + ' ' + dist.toFixed(0) + 'm';
+
+    // Proietta posizione Mole sullo schermo per il tag distanza
+    const moleScreen = new THREE.Vector3(moleGroup.position.x, 80, moleGroup.position.z);
+    moleScreen.project(camera);
+    if (moleScreen.z < 1 && Math.abs(moleScreen.x) < 1.2 && Math.abs(moleScreen.y) < 1.2) {
+      const sx = (moleScreen.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-moleScreen.y * 0.5 + 0.5) * window.innerHeight;
+      distTag.style.display = 'block';
+      distTag.style.left = sx + 'px';
+      distTag.style.top = sy + 'px';
+      distTag.textContent = 'Mole · ' + dist.toFixed(0) + 'm';
+    } else {
+      distTag.style.display = 'none';
+    }
+  }
+
+  // Aggiorna bussola
+  needle.setAttribute('transform', 'rotate(' + (-heading) + ' 25 25)');
+}
+
+// === AVVIO ===
+startBtn.addEventListener('click', async () => {
+  
+  // 1. Permesso orientamento iOS
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      log('Orientamento: ' + perm);
+    }
+  } catch(e) { log('Err orientamento: ' + e); }
+
+  // 2. Bussola
+  window.addEventListener('deviceorientation', (e) => {
+    // iOS: webkitCompassHeading è l'heading assoluto
+    if (e.webkitCompassHeading !== undefined) {
+      heading = e.webkitCompassHeading;
+    } else if (e.alpha !== null) {
+      // Android: alpha è relativo, approssimiamo
+      heading = (360 - e.alpha) % 360;
+    }
+    deviceBeta = e.beta || 0;
+    deviceGamma = e.gamma || 0;
+  }, true);
+
+  // 3. Fotocamera
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = stream;
+    log('Camera OK');
+  } catch(e) { log('Camera err: ' + e); }
+
+  // 4. GPS
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      userLat = pos.coords.latitude;
+      userLon = pos.coords.longitude;
+      if (!gpsReady) {
+        gpsReady = true;
+        log('GPS pronto: ' + userLat.toFixed(6) + ', ' + userLon.toFixed(6) + ' ±' + pos.coords.accuracy.toFixed(0) + 'm');
+
+        // Posiziona cubo test a 25m nord dell'utente
+        testCube.position.set(0, 2.5, -25);
+        log('Cubo rosso piazzato a 25m nord');
+      }
+    },
+    (e) => { log('GPS err: ' + e.message); },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+  );
+
+  // 5. Nascondi splash e avvia
+  splash.classList.add('hide');
+  log('AR avviata');
+  animate();
+});
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
