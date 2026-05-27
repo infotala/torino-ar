@@ -30,7 +30,30 @@ body{background:#000}
   color:#1a1916;font:bold 12px sans-serif;padding:4px 10px;border-radius:3px;
   pointer-events:none;display:none;white-space:nowrap}
 #log{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.8);
-  color:#0f0;font:10px monospace;padding:6px 10px;max-height:20vh;overflow-y:auto}
+  color:#0f0;font:10px monospace;padding:6px 10px;max-height:15vh;overflow-y:auto}
+
+/* CALIBRATION PANEL */
+#calib{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(0,0,0,0.9);
+  padding:10px 12px 14px;display:none;border-top:2px solid #C9A84C}
+#calib.show{display:block}
+#calib-toggle{position:fixed;bottom:10px;right:10px;z-index:21;background:#C9A84C;
+  color:#1a1916;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;
+  cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);display:none}
+#calib-toggle.show{display:block}
+.calib-title{font:bold 10px sans-serif;color:#C9A84C;letter-spacing:0.15em;
+  text-transform:uppercase;margin-bottom:8px}
+.calib-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.calib-label{color:#888;font:10px sans-serif;width:70px;text-transform:uppercase;
+  letter-spacing:0.08em}
+.calib-val{color:#C9A84C;font:bold 13px monospace;width:70px;text-align:center}
+.calib-btn{background:#333;color:#ddd;border:1px solid #555;border-radius:3px;
+  padding:6px 0;font-size:16px;cursor:pointer;width:36px;text-align:center}
+.calib-btn:active{background:#555}
+.calib-btn-sm{width:28px;font-size:12px;padding:4px 0}
+.calib-spacer{width:6px}
+#calib-copy{margin-top:8px;width:100%;background:#C9A84C;color:#1a1916;border:none;
+  border-radius:3px;padding:10px;font:bold 12px sans-serif;letter-spacing:0.1em;
+  text-transform:uppercase;cursor:pointer}
 </style>
 </head>
 <body>
@@ -55,6 +78,60 @@ body{background:#000}
   </svg>
 </div>
 <div id="distance-tag"></div>
+
+<button id="calib-toggle" onclick="toggleCalib()">⚙</button>
+
+<div id="calib">
+  <div class="calib-title">Calibrazione</div>
+  
+  <div class="calib-row">
+    <div class="calib-label">Altezza</div>
+    <button class="calib-btn" onclick="adj('y',-5)">▼▼</button>
+    <button class="calib-btn calib-btn-sm" onclick="adj('y',-1)">▼</button>
+    <div class="calib-val" id="v-y">0 m</div>
+    <button class="calib-btn calib-btn-sm" onclick="adj('y',1)">▲</button>
+    <button class="calib-btn" onclick="adj('y',5)">▲▲</button>
+  </div>
+  
+  <div class="calib-row">
+    <div class="calib-label">Rotazione</div>
+    <button class="calib-btn" onclick="adj('r',-10)">◄◄</button>
+    <button class="calib-btn calib-btn-sm" onclick="adj('r',-2)">◄</button>
+    <div class="calib-val" id="v-r">0°</div>
+    <button class="calib-btn calib-btn-sm" onclick="adj('r',2)">►</button>
+    <button class="calib-btn" onclick="adj('r',10)">►►</button>
+  </div>
+  
+  <div class="calib-row">
+    <div class="calib-label">Scala</div>
+    <button class="calib-btn" onclick="adj('s',-0.2)">−−</button>
+    <button class="calib-btn calib-btn-sm" onclick="adj('s',-0.05)">−</button>
+    <div class="calib-val" id="v-s">1.0x</div>
+    <button class="calib-btn calib-btn-sm" onclick="adj('s',0.05)">+</button>
+    <button class="calib-btn" onclick="adj('s',0.2)">++</button>
+  </div>
+
+  <div class="calib-row">
+    <div class="calib-label">Nord/Sud</div>
+    <button class="calib-btn" onclick="adj('lat',-0.0001)">S▼</button>
+    <button class="calib-btn calib-btn-sm" onclick="adj('lat',-0.00002)">s</button>
+    <div class="calib-val" id="v-lat">0</div>
+    <button class="calib-btn calib-btn-sm" onclick="adj('lat',0.00002)">n</button>
+    <button class="calib-btn" onclick="adj('lat',0.0001)">N▲</button>
+  </div>
+
+  <div class="calib-row">
+    <div class="calib-label">Est/Ovest</div>
+    <button class="calib-btn" onclick="adj('lon',-0.0001)">O◄</button>
+    <button class="calib-btn calib-btn-sm" onclick="adj('lon',-0.00002)">o</button>
+    <div class="calib-val" id="v-lon">0</div>
+    <button class="calib-btn calib-btn-sm" onclick="adj('lon',0.00002)">e</button>
+    <button class="calib-btn" onclick="adj('lon',0.0001)">E►</button>
+  </div>
+
+  <button id="calib-copy" onclick="copyCalib()">📋 Copia valori e manda a Claude</button>
+</div>
+
 <div id="log"></div>
 
 <script type="importmap">
@@ -68,7 +145,6 @@ body{background:#000}
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -86,14 +162,63 @@ function log(m) {
   if (logEl.children.length > 30) logEl.lastChild.remove();
 }
 
-// === COORDINATE MOLE ===
-const MOLE_LAT = 45.06935;
-const MOLE_LON = 7.69295;
+// === COORDINATE MOLE (base) ===
+const BASE_LAT = 45.06935;
+const BASE_LON = 7.69295;
+
+// === CALIBRAZIONE ===
+const cal = { y: 0, r: 0, s: 1.0, lat: 0, lon: 0 };
+
+window.adj = function(axis, delta) {
+  if (axis === 's') cal.s = Math.max(0.1, Math.round((cal.s + delta) * 100) / 100);
+  else if (axis === 'y') cal.y = Math.round((cal.y + delta) * 10) / 10;
+  else if (axis === 'r') cal.r = Math.round(((cal.r + delta) + 360) % 360 * 10) / 10;
+  else if (axis === 'lat') cal.lat = Math.round((cal.lat + delta) * 100000) / 100000;
+  else if (axis === 'lon') cal.lon = Math.round((cal.lon + delta) * 100000) / 100000;
+
+  document.getElementById('v-y').textContent = cal.y + ' m';
+  document.getElementById('v-r').textContent = cal.r + '°';
+  document.getElementById('v-s').textContent = cal.s + 'x';
+  document.getElementById('v-lat').textContent = (cal.lat >= 0 ? '+' : '') + cal.lat;
+  document.getElementById('v-lon').textContent = (cal.lon >= 0 ? '+' : '') + cal.lon;
+
+  // Applica
+  if (moleGroup) {
+    moleGroup.rotation.y = cal.r * Math.PI / 180;
+    if (baseScale) {
+      moleGroup.scale.set(baseScale * cal.s, baseScale * cal.s, baseScale * cal.s);
+    }
+  }
+};
+
+window.toggleCalib = function() {
+  document.getElementById('calib').classList.toggle('show');
+};
+
+window.copyCalib = function() {
+  const moleLat = (BASE_LAT + cal.lat).toFixed(6);
+  const moleLon = (BASE_LON + cal.lon).toFixed(6);
+  const txt = 'CALIBRAZIONE MOLE ANTONELLIANA\n' +
+    'Altezza: ' + cal.y + 'm\n' +
+    'Rotazione: ' + cal.r + '°\n' +
+    'Scala: ' + cal.s + 'x\n' +
+    'Lat offset: ' + cal.lat + ' → ' + moleLat + '\n' +
+    'Lon offset: ' + cal.lon + ' → ' + moleLon;
+  
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(function() {
+      alert('Valori copiati!\n\nIncollali nella chat con Claude.');
+    });
+  } else {
+    prompt('Copia questi valori e mandali a Claude:', txt);
+  }
+};
 
 // === STATO ===
-let heading = 0, deviceBeta = 0, deviceGamma = 0;
+let heading = 0, deviceBeta = 0;
 let userLat = 0, userLon = 0, gpsReady = false;
-let moleModel = null;
+let moleGroup = null;
+let baseScale = null;
 
 // === MATH GEO ===
 function gpsToLocal(lat, lon, refLat, refLon) {
@@ -131,16 +256,13 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
 camera.position.set(0, 1.6, 0);
 
-// Luci
 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
 sun.position.set(100, 200, 50);
 scene.add(sun);
-const hemi = new THREE.HemisphereLight(0x87CEEB, 0x654321, 0.3);
-scene.add(hemi);
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0x654321, 0.3));
 
-// Gruppo Mole
-const moleGroup = new THREE.Group();
+moleGroup = new THREE.Group();
 scene.add(moleGroup);
 
 // Cubo rosso test
@@ -154,41 +276,24 @@ scene.add(testCube);
 // === CARICA GLB ===
 function loadMoleGLB() {
   return new Promise((resolve, reject) => {
-    const loader = new GLTFLoader();
-    loader.load(
+    new GLTFLoader().load(
       'mole_antonelliana_torino.glb',
       (gltf) => {
-        moleModel = gltf.scene;
-        
-        // Calcola dimensioni attuali per scalare correttamente
-        const box = new THREE.Box3().setFromObject(moleModel);
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3();
         box.getSize(size);
-        const currentHeight = size.y;
-        
-        // La Mole è alta 167m — scala di conseguenza
-        const targetHeight = 167;
-        const scaleFactor = targetHeight / currentHeight;
-        moleModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-        
-        // Ricalcola dopo scala per posizionare base al suolo
-        const box2 = new THREE.Box3().setFromObject(moleModel);
-        moleModel.position.y = -box2.min.y;
-        
-        moleGroup.add(moleModel);
-        log('Mole GLB caricato ✅ scala: ' + scaleFactor.toFixed(2) + 'x');
+        const scaleFactor = 167 / size.y;
+        baseScale = scaleFactor;
+        model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        const box2 = new THREE.Box3().setFromObject(model);
+        model.position.y = -box2.min.y;
+        moleGroup.add(model);
+        log('GLB caricato ✅ scala:' + scaleFactor.toFixed(2));
         resolve();
       },
-      (progress) => {
-        if (progress.total) {
-          const pct = (progress.loaded / progress.total * 100).toFixed(0);
-          loadingEl.textContent = 'Caricamento modello: ' + pct + '%';
-        }
-      },
-      (err) => {
-        log('GLB errore: ' + err.message);
-        reject(err);
-      }
+      (p) => { if (p.total) loadingEl.textContent = 'Modello: ' + (p.loaded/p.total*100).toFixed(0) + '%'; },
+      (err) => { log('GLB err: ' + err.message); reject(err); }
     );
   });
 }
@@ -198,34 +303,34 @@ function animate() {
   requestAnimationFrame(animate);
 
   if (gpsReady) {
-    const moleLocal = gpsToLocal(MOLE_LAT, MOLE_LON, userLat, userLon);
-    moleGroup.position.set(moleLocal.x, 0, moleLocal.z);
+    const moleLat = BASE_LAT + cal.lat;
+    const moleLon = BASE_LON + cal.lon;
+    const moleLocal = gpsToLocal(moleLat, moleLon, userLat, userLon);
+    moleGroup.position.set(moleLocal.x, cal.y, moleLocal.z);
   }
 
-  const headingRad = heading * Math.PI / 180;
-  const betaRad = deviceBeta * Math.PI / 180;
-
   camera.rotation.order = 'YXZ';
-  camera.rotation.y = -headingRad;
-  camera.rotation.x = -(betaRad - Math.PI/2);
+  camera.rotation.y = -(heading * Math.PI / 180);
+  camera.rotation.x = -(deviceBeta * Math.PI / 180 - Math.PI / 2);
 
   renderer.render(scene, camera);
 
-  // HUD
   if (gpsReady) {
-    const dist = haversine(userLat, userLon, MOLE_LAT, MOLE_LON);
-    const bear = bearing(userLat, userLon, MOLE_LAT, MOLE_LON);
+    const moleLat = BASE_LAT + cal.lat;
+    const moleLon = BASE_LON + cal.lon;
+    const dist = haversine(userLat, userLon, moleLat, moleLon);
+    const bear = bearing(userLat, userLon, moleLat, moleLon);
     hudBar.textContent = 'GPS: ' + userLat.toFixed(5) + ', ' + userLon.toFixed(5) +
       ' | Mole: ' + dist.toFixed(0) + 'm · ' + bear.toFixed(0) + '°';
 
     let rel = ((bear - heading) + 360) % 360;
-    let arrow = '↑';
+    let arrow = '↑ davanti';
     if (rel > 22 && rel <= 67) arrow = '↗';
-    else if (rel > 67 && rel <= 112) arrow = '→';
+    else if (rel > 67 && rel <= 112) arrow = '→ destra';
     else if (rel > 112 && rel <= 157) arrow = '↘';
-    else if (rel > 157 && rel <= 202) arrow = '↓ (dietro)';
+    else if (rel > 157 && rel <= 202) arrow = '↓ dietro';
     else if (rel > 202 && rel <= 247) arrow = '↙';
-    else if (rel > 247 && rel <= 292) arrow = '←';
+    else if (rel > 247 && rel <= 292) arrow = '← sinistra';
     else if (rel > 292 && rel <= 337) arrow = '↖';
     dirEl.textContent = 'Mole ' + arrow + ' ' + dist.toFixed(0) + 'm';
 
@@ -252,26 +357,18 @@ startBtn.addEventListener('click', async () => {
   startBtn.textContent = 'Caricamento...';
   loadingEl.style.display = 'block';
 
-  // 1. Permesso orientamento iOS
   try {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      const perm = await DeviceOrientationEvent.requestPermission();
-      log('Orientamento: ' + perm);
+      await DeviceOrientationEvent.requestPermission();
     }
-  } catch(e) { log('Err orientamento: ' + e); }
+  } catch(e) { log('Err orient: ' + e); }
 
-  // 2. Bussola
   window.addEventListener('deviceorientation', (e) => {
-    if (e.webkitCompassHeading !== undefined) {
-      heading = e.webkitCompassHeading;
-    } else if (e.alpha !== null) {
-      heading = (360 - e.alpha) % 360;
-    }
+    if (e.webkitCompassHeading !== undefined) heading = e.webkitCompassHeading;
+    else if (e.alpha !== null) heading = (360 - e.alpha) % 360;
     deviceBeta = e.beta || 0;
-    deviceGamma = e.gamma || 0;
   }, true);
 
-  // 3. Fotocamera
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -280,25 +377,17 @@ startBtn.addEventListener('click', async () => {
     log('Camera OK');
   } catch(e) { log('Camera err: ' + e); }
 
-  // 4. Carica GLB
   try {
     await loadMoleGLB();
   } catch(e) {
-    log('Fallback: uso sagoma placeholder');
-    // Fallback placeholder
-    const baseGeo = new THREE.BoxGeometry(40, 30, 40);
-    const baseMat = new THREE.MeshLambertMaterial({ color: 0xD4C5A0 });
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = 15;
-    moleGroup.add(base);
-    const spireGeo = new THREE.ConeGeometry(8, 140, 8);
-    const spireMat = new THREE.MeshLambertMaterial({ color: 0xB8A888 });
-    const spire = new THREE.Mesh(spireGeo, spireMat);
-    spire.position.y = 100;
-    moleGroup.add(spire);
+    log('Fallback placeholder');
+    const base = new THREE.Mesh(new THREE.BoxGeometry(40,30,40), new THREE.MeshLambertMaterial({color:0xD4C5A0}));
+    base.position.y = 15; moleGroup.add(base);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(8,140,8), new THREE.MeshLambertMaterial({color:0xB8A888}));
+    spire.position.y = 100; moleGroup.add(spire);
+    baseScale = 1;
   }
 
-  // 5. GPS
   navigator.geolocation.watchPosition(
     (pos) => {
       userLat = pos.coords.latitude;
@@ -306,16 +395,15 @@ startBtn.addEventListener('click', async () => {
       if (!gpsReady) {
         gpsReady = true;
         log('GPS: ' + userLat.toFixed(6) + ', ' + userLon.toFixed(6) + ' ±' + pos.coords.accuracy.toFixed(0) + 'm');
-        testCube.position.set(0, 2.5, -25);
       }
     },
     (e) => { log('GPS err: ' + e.message); },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
   );
 
-  // 6. Via
   splash.classList.add('hide');
-  log('AR avviata');
+  document.getElementById('calib-toggle').classList.add('show');
+  log('AR avviata — premi ⚙ per calibrazione');
   animate();
 });
 
